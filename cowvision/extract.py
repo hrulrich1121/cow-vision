@@ -74,7 +74,9 @@ def _px_box(frac: list[float], w: int, h: int) -> tuple[int, int, int, int]:
 
 
 def frame_paths(out_root: Path, v: VideoInfo, side: str) -> Path:
-    return out_root / v.date / v.channel / side
+    # One folder per segment: a day has ~12 segments and each restarts at 000001.jpg,
+    # so sharing a folder would overwrite every segment but the last.
+    return out_root / v.date / v.channel / side / v.start.strftime("%H%M%S")
 
 
 def _stamp(v: VideoInfo, offset_s: float) -> datetime:

@@ -38,8 +38,15 @@ DEFAULT_CONFIG = {
     #   aspect = width / height ; height_frac = height / crop_height
     # A standing calf is taller and narrower; a lying calf is flatter.
     # Re-tune with `cowvision calibrate` once you have real detections.
+    # The geometry rule assumes a side view and is wrong for the top-down CH1 camera.
+    # "detector_class" reads posture straight off the detector's class name (train the
+    # detector with lying/standing boxes) and is the intended path for real footage.
     "posture": {
-        "method": "geometry",            # "geometry" | "classifier"
+        "method": "geometry",            # "geometry" | "detector_class" | "classifier"
+        "class_map": {                   # detector class name -> posture label
+            "lying": "lying",
+            "standing": "standing"
+        },
         "lying_aspect_min": 1.45,        # aspect >= this  -> lying
         "standing_aspect_max": 1.15,     # aspect <= this  -> standing
         "standing_height_frac_min": 0.35,

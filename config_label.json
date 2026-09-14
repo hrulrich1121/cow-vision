@@ -1,0 +1,57 @@
+{
+  "sample_fps": 0.05,
+  "jpeg_quality": 85,
+  "save_crops": true,
+  "crops": {
+    "default": {
+      "left": [
+        0.0,
+        0.0,
+        0.5,
+        1.0
+      ],
+      "right": [
+        0.5,
+        0.0,
+        1.0,
+        1.0
+      ]
+    },
+    "CH1": {
+      "left": [
+        0.0,
+        0.03,
+        0.56,
+        0.82
+      ],
+      "right": [
+        0.56,
+        0.03,
+        1.0,
+        0.82
+      ]
+    }
+  },
+  "detector": {
+    "model": "models/calf_posture_v2.pt",
+    "conf": 0.25,
+    "imgsz": 640,
+    "device": "",
+    "classes": [],
+    "max_per_crop": 1
+  },
+  "posture": {
+    "method": "detector_class",
+    "lying_aspect_min": 1.45,
+    "standing_aspect_max": 1.15,
+    "standing_height_frac_min": 0.35,
+    "smooth_window": 5,
+    "classifier_weights": ""
+  },
+  "scale": {
+    "default": {
+      "left": null,
+      "right": null
+    }
+  }
+}

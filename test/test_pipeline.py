@@ -48,6 +48,7 @@ class _Boxes:
     def __init__(self, xyxy, conf):
         self.xyxy = [np.array(xyxy)]
         self.conf = np.array([conf])
+        self.cls = np.array([0])
 
     def __len__(self):
         return len(self.conf)
@@ -56,12 +57,15 @@ class _Boxes:
 class _Empty:
     xyxy: list = []
     conf = np.array([])
+    cls = np.array([])
 
     def __len__(self):
         return 0
 
 
 class _Result:
+    names = {0: "calf"}
+
     def __init__(self, boxes):
         self.boxes = boxes
 

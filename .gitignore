@@ -1,8 +1,11 @@
 __pycache__/
 *.pyc
 output/
+output_labelset/
+runs/
 test/output/
 test/VIDEOS/
 test/config.json
 .venv/
 *.pt
+CLAUDE.md

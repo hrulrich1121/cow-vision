@@ -81,7 +81,8 @@ def run(index_csv: Path, out_csv: Path, cfg: dict, batch: int = 32,
             if len(res.boxes):
                 i = int(res.boxes.conf.argmax())
                 xyxy = [float(x) for x in res.boxes.xyxy[i].tolist()]
-                best = (float(res.boxes.conf[i]), xyxy)
+                cls_name = str(res.names[int(res.boxes.cls[i])])
+                best = (float(res.boxes.conf[i]), xyxy, cls_name)
 
             row = {k: r[k] for k in
                    ("frame_path", "channel", "side", "date", "timestamp", "video", "offset_s")}
@@ -90,10 +91,14 @@ def run(index_csv: Path, out_csv: Path, cfg: dict, batch: int = 32,
                            box_w="", box_h="", aspect="", height_frac="",
                            length_px="", length_cm="", posture_raw=UNKNOWN)
             else:
-                conf, (x1, y1, x2, y2) = best
+                conf, (x1, y1, x2, y2), cls_name = best
                 bw, bh = x2 - x1, y2 - y1
                 cm_per_px = scale_for(cfg, r["channel"], r["side"])
                 length_px = max(bw, bh)
+                if p["method"] == "detector_class":
+                    posture_raw = p["class_map"].get(cls_name, UNKNOWN)
+                else:
+                    posture_raw = classify_geometry(bw, bh, crop_h, p)
                 row.update(
                     detected=1, conf=round(conf, 3),
                     x1=round(x1, 1), y1=round(y1, 1), x2=round(x2, 1), y2=round(y2, 1),
@@ -102,7 +107,7 @@ def run(index_csv: Path, out_csv: Path, cfg: dict, batch: int = 32,
                     height_frac=round(bh / crop_h, 3) if crop_h else "",
                     length_px=round(length_px, 1),
                     length_cm=round(length_px * cm_per_px, 1) if cm_per_px else "",
-                    posture_raw=classify_geometry(bw, bh, crop_h, p),
+                    posture_raw=posture_raw,
                 )
             results_rows.append(row)
         if progress_every and (start // batch) % max(1, progress_every // batch) == 0:
