@@ -1,4 +1,6 @@
-"""Parse camera filenames like CH1_20260729103855-20260729124739.mp4"""
+"""Parses camera filenames like CH1_20260729103855-20260729124739.mp4 into a
+channel + start/end timestamps. Everything downstream keys off this.
+"""
 from __future__ import annotations
 
 import re

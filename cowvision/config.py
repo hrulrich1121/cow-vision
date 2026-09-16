@@ -1,4 +1,6 @@
-"""Configuration loading. Plain JSON so the tool has no extra dependencies."""
+"""Pipeline config: sampling, crop boxes, detector, posture, scale.
+Loads from config.json, falling back to the defaults below.
+"""
 from __future__ import annotations
 
 import copy
@@ -36,13 +38,8 @@ DEFAULT_CONFIG = {
     # ---- posture --------------------------------------------------------
     # Baseline rule on the detection box inside its crop:
     #   aspect = width / height ; height_frac = height / crop_height
-    # A standing calf is taller and narrower; a lying calf is flatter.
-    # Re-tune with `cowvision calibrate` once you have real detections.
-    # The geometry rule assumes a side view and is wrong for the top-down CH1 camera.
-    # "detector_class" reads posture straight off the detector's class name (train the
-    # detector with lying/standing boxes) and is the intended path for real footage.
     "posture": {
-        "method": "geometry",            # "geometry" | "detector_class" | "classifier"
+        "method": "geometry",            # "geometry" | "detector_class" (see below)
         "class_map": {                   # detector class name -> posture label
             "lying": "lying",
             "standing": "standing"
@@ -51,12 +48,11 @@ DEFAULT_CONFIG = {
         "standing_aspect_max": 1.15,     # aspect <= this  -> standing
         "standing_height_frac_min": 0.35,
         "smooth_window": 5,              # median filter over N sampled frames
-        "classifier_weights": ""         # path to a posture classifier, when trained
+        "classifier_weights": ""         # unused for now -- reserved for later
     },
 
-    # ---- pixel -> real world -------------------------------------------
-    # Fill in once you have a reference object of known length in each pen.
-    # length_cm = box_length_px * cm_per_px
+    # ---- pixel -> real world ---------------------------------------------
+    # length_cm = box_length_px * cm_per_px. Unused for now
     "scale": {
         "default": {"left": None, "right": None}
     }

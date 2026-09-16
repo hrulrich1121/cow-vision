@@ -1,4 +1,8 @@
-"""Goal 3: daily lying / standing time per calf."""
+"""Goal 3: turn detections.csv into daily numbers.
+
+summarize() -> one row per calf per day (hours lying/standing, detection rate).
+bouts() -> continuous lying/standing stretches (60s+), for welfare metrics later.
+"""
 from __future__ import annotations
 
 import csv

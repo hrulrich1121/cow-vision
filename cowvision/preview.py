@@ -1,4 +1,6 @@
-"""Draw the configured pen boxes on a full frame so the split can be eyeballed."""
+"""Draws the configured crop boxes on a few real frames, so they can be
+checked against the pens before running a full extract.
+"""
 from __future__ import annotations
 
 from pathlib import Path

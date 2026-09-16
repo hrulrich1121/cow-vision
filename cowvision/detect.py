@@ -1,11 +1,8 @@
-"""Detect the calf in each crop and label its posture.
+"""Runs YOLO on each crop, labels lying/standing, writes detections.csv.
 
-Detection: Ultralytics YOLO (COCO weights out of the box, your Roboflow-trained
-weights once you have them -- just point detector.model at the .pt file).
-
-Posture baseline ("geometry"): the calf's bounding box is taller than it is wide
-when it stands and flatter when it lies down. Thresholds live in config.json and
-can be re-tuned from real data with `cowvision calibrate`.
+posture.method: "detector_class" reads the label off the detector (main path).
+"geometry" is a fallback shape rule, tunable with `cowvision calibrate`.
+"classifier" is reserved for later -- unused for now, falls back to geometry.
 """
 from __future__ import annotations
 

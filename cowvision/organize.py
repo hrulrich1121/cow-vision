@@ -1,4 +1,7 @@
-"""Goal 1: organize the videos by date."""
+"""Goal 1: scan the raw videos, write a manifest + coverage report.
+organize_by_date() can also physically sort files into dated folders,
+but run_all.sh doesn't use that -- --by-date is unused for now.
+"""
 from __future__ import annotations
 
 import csv
