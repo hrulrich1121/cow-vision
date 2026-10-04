@@ -31,7 +31,18 @@ for d in $dates; do
   df -h "$OUT" | tail -1
 done
 
-# one combined summary across dates
-{ head -n1 "$(ls "$OUT"/*/daily_summary.csv | head -n1)"; for f in "$OUT"/*/daily_summary.csv; do tail -n +2 "$f"; done; } > "$OUT/daily_summary_all.csv"
-{ head -n1 "$(ls "$OUT"/*/bouts.csv | head -n1)"; for f in "$OUT"/*/bouts.csv; do tail -n +2 "$f"; done; } > "$OUT/bouts_all.csv"
+# one combined summary across dates. `combine` is used rather than a plain
+# concatenation because a segment crossing midnight puts a few frames in the next
+# date, which would otherwise give that calf-day two rows.
+python -m cowvision --out "$OUT" combine --run "$OUT"
+
+# per-minute activity, for the observer scoring video against it
+python -m cowvision --out "$OUT" minutely --run "$OUT"
+
+# bouts over the whole run at once, not per date: a bout that runs through
+# midnight is one bout, and concatenating per-date files would cut every one of
+# them in two.
+python -m cowvision --out "$OUT" bouts --run "$OUT" --output "$OUT/bouts_all.csv"
+
 echo "== all done $(date)"
+echo "pull back: daily_summary_all.csv  minute_activity.csv  bouts_all.csv  bout_summary.csv"

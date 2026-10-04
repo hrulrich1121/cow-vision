@@ -40,15 +40,54 @@ DEFAULT_CONFIG = {
     #   aspect = width / height ; height_frac = height / crop_height
     "posture": {
         "method": "geometry",            # "geometry" | "detector_class" (see below)
-        "class_map": {                   # detector class name -> posture label
+        # detector class name -> posture. Eating and drinking are things a calf
+        # does while standing, so they roll up into "standing" here and the
+        # lying/standing totals stay comparable with the earlier runs.
+        "class_map": {
             "lying": "lying",
-            "standing": "standing"
+            "standing": "standing",
+            "eating": "standing",
+            "drinking": "standing"
+        },
+        # detector class name -> activity, the finer label the bout counts and
+        # the eating/drinking minutes are built from. A class missing here is
+        # carried through under its own name.
+        "activity_map": {
+            "lying": "lying",
+            "standing": "standing",
+            "eating": "eating",
+            "drinking": "drinking"
         },
         "lying_aspect_min": 1.45,        # aspect >= this  -> lying
         "standing_aspect_max": 1.15,     # aspect <= this  -> standing
         "standing_height_frac_min": 0.35,
         "smooth_window": 5,              # median filter over N sampled frames
         "classifier_weights": ""         # unused for now -- reserved for later
+    },
+
+    # ---- feed zones -------------------------------------------------------
+    # Where the feed/water buckets sit inside each *crop*, as fractions
+    # [x1, y1, x2, y2]. Only used to pick frames worth hand-labelling: a calf
+    # whose box covers this zone is probably at the buckets. Never a label in
+    # its own right - a calf can stand in front of the buckets without eating,
+    # which is exactly why the behaviour is learnt rather than inferred here.
+    "zones": {
+        "default": {"left": None, "right": None}
+    },
+
+    # ---- bouts -----------------------------------------------------------
+    # Minimum length of a run of one activity, in seconds. Shorter runs are
+    # absorbed into their neighbours (see aggregate._merge_short_runs), so these
+    # are flicker filters as much as bout definitions - raising one lowers the
+    # daily bout count and lengthens the mean bout.
+    "bouts": {
+        "min_bout_s": {
+            "lying": 300, "standing": 300, "eating": 30, "drinking": 30
+        },
+        "max_unknown_s": 120, # an undetected patch up to this long is bridged
+                              # rather than ending the bout
+        "max_gap_s": None     # null = 3x the sample spacing; bouts never bridge a
+                              # longer break, so a missing segment splits a bout
     },
 
     # ---- pixel -> real world ---------------------------------------------

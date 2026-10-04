@@ -12,7 +12,8 @@ from pathlib import Path
 DET_FIELDS = [
     "frame_path", "channel", "side", "date", "timestamp", "video", "offset_s",
     "detected", "conf", "x1", "y1", "x2", "y2", "box_w", "box_h",
-    "aspect", "height_frac", "length_px", "length_cm", "posture_raw", "posture",
+    "aspect", "height_frac", "length_px", "length_cm",
+    "posture_raw", "posture", "activity_raw", "activity",
 ]
 
 LYING, STANDING, UNKNOWN = "lying", "standing", "unknown"
@@ -86,7 +87,8 @@ def run(index_csv: Path, out_csv: Path, cfg: dict, batch: int = 32,
             if best is None:
                 row.update(detected=0, conf="", x1="", y1="", x2="", y2="",
                            box_w="", box_h="", aspect="", height_frac="",
-                           length_px="", length_cm="", posture_raw=UNKNOWN)
+                           length_px="", length_cm="", posture_raw=UNKNOWN,
+                           activity_raw=UNKNOWN)
             else:
                 conf, (x1, y1, x2, y2), cls_name = best
                 bw, bh = x2 - x1, y2 - y1
@@ -94,8 +96,10 @@ def run(index_csv: Path, out_csv: Path, cfg: dict, batch: int = 32,
                 length_px = max(bw, bh)
                 if p["method"] == "detector_class":
                     posture_raw = p["class_map"].get(cls_name, UNKNOWN)
+                    activity_raw = p.get("activity_map", {}).get(cls_name, cls_name)
                 else:
                     posture_raw = classify_geometry(bw, bh, crop_h, p)
+                    activity_raw = posture_raw
                 row.update(
                     detected=1, conf=round(conf, 3),
                     x1=round(x1, 1), y1=round(y1, 1), x2=round(x2, 1), y2=round(y2, 1),
@@ -104,7 +108,7 @@ def run(index_csv: Path, out_csv: Path, cfg: dict, batch: int = 32,
                     height_frac=round(bh / crop_h, 3) if crop_h else "",
                     length_px=round(length_px, 1),
                     length_cm=round(length_px * cm_per_px, 1) if cm_per_px else "",
-                    posture_raw=posture_raw,
+                    posture_raw=posture_raw, activity_raw=activity_raw,
                 )
             results_rows.append(row)
         if progress_every and (start // batch) % max(1, progress_every // batch) == 0:
@@ -116,9 +120,10 @@ def run(index_csv: Path, out_csv: Path, cfg: dict, batch: int = 32,
         by_track.setdefault((row["channel"], row["side"]), []).append(row)
     for track in by_track.values():
         track.sort(key=lambda r: r["timestamp"])
-        smoothed = _smooth([r["posture_raw"] for r in track], int(p["smooth_window"]))
-        for r, s in zip(track, smoothed):
-            r["posture"] = s
+        window = int(p["smooth_window"])
+        for src, dst in (("posture_raw", "posture"), ("activity_raw", "activity")):
+            for r, lab in zip(track, _smooth([r[src] for r in track], window)):
+                r[dst] = lab
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", newline="") as f:

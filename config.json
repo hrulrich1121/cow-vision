@@ -46,12 +46,54 @@
     "standing_aspect_max": 1.15,
     "standing_height_frac_min": 0.35,
     "smooth_window": 5,
-    "classifier_weights": ""
+    "classifier_weights": "",
+    "class_map": {
+      "lying": "lying",
+      "standing": "standing",
+      "eating": "standing",
+      "drinking": "standing"
+    },
+    "activity_map": {
+      "lying": "lying",
+      "standing": "standing",
+      "eating": "eating",
+      "drinking": "drinking"
+    }
   },
   "scale": {
     "default": {
       "left": null,
       "right": null
     }
+  },
+  "zones": {
+    "default": {
+      "left": null,
+      "right": null
+    },
+    "CH1": {
+      "left": [
+        0.13,
+        0.13,
+        0.38,
+        0.32
+      ],
+      "right": [
+        0.31,
+        0.12,
+        0.71,
+        0.34
+      ]
+    }
+  },
+  "bouts": {
+    "min_bout_s": {
+      "lying": 300,
+      "standing": 300,
+      "eating": 30,
+      "drinking": 30
+    },
+    "max_gap_s": null,
+    "max_unknown_s": 120
   }
 }

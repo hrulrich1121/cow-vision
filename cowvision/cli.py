@@ -3,10 +3,14 @@
   cowvision init-config
   cowvision organize   --videos <dir> [--out <dir>] [--by-date] [--mode link|copy|move]
   cowvision preview    --videos <dir> [--at 0,600,3600]
-  cowvision extract    --videos <dir> [--limit-frames N]
+  cowvision extract    --videos <dir> [--limit-frames N] [--between 06:30-08:00]
   cowvision detect
   cowvision calibrate
   cowvision summarize
+  cowvision minutely   [--run <dir>]   per-minute activity CSV, for validation
+  cowvision bouts      [--run <dir>]   bouts.csv + bout_summary.csv (counts per day)
+  cowvision labelset   --out <dir> --upload <dir> [--target N]   frames to hand-label
+  cowvision combine    [--run <dir>]   merge per-date summaries into one CSV
   cowvision all        --videos <dir>
 """
 from __future__ import annotations
@@ -15,7 +19,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import aggregate, detect, extract, organize, preview
+from . import aggregate, detect, extract, labelset, minutely, organize, preview
 from .config import load_config, write_default_config
 from .naming import scan_videos
 
@@ -29,6 +33,8 @@ def _paths(args):
         "det": out / "detections.csv",
         "summary": out / "daily_summary.csv",
         "bouts": out / "bouts.csv",
+        "bout_summary": out / "bout_summary.csv",
+        "minutes": out / "minute_activity.csv",
         "preview": out / "preview",
     }
 
@@ -89,8 +95,12 @@ def cmd_extract(args):
     if not videos:
         print("no videos selected")
         return
+    windows = extract.parse_windows(getattr(args, "between", None))
+    if windows:
+        print("  keeping frames inside " + ", ".join(
+            f"{a.strftime('%H:%M')}-{b.strftime('%H:%M')}" for a, b in windows))
     n = extract.extract_all(videos, P["frames"], cfg, P["index"],
-                            args.limit_frames, args.backend)
+                            args.limit_frames, args.backend, windows)
     print(f"{n} sampled frames -> {P['frames']}\nindex -> {P['index']}")
 
 
@@ -113,6 +123,102 @@ def cmd_summarize(args):
     b = aggregate.bouts(P["det"], P["bouts"], cfg["sample_fps"])
     print(f"daily summary -> {s}\nbouts -> {b}\n")
     print(Path(s).read_text())
+
+
+def _run_root(args) -> Path:
+    return Path(args.run) if args.run else Path(args.out)
+
+
+def cmd_minutely(args):
+    root = _run_root(args)
+    dets = minutely.find_detections(root)
+    if not dets:
+        print(f"no detections.csv under {root}")
+        return
+    out = Path(args.output) if args.output else root / "minute_activity.csv"
+    out, n = minutely.minutely(dets, out)
+    print(f"{len(dets)} detections.csv -> {n} minute rows")
+    print(out)
+
+
+def cmd_bouts(args):
+    """Bouts for a whole run: per-date detections.csv, or one minute_activity.csv.
+
+    The per-minute file is enough to count bouts and is small enough to work on
+    off the server, so it is accepted as a source in its own right.
+    """
+    cfg = load_config(Path(args.config))
+    bc = cfg.get("bouts", {})
+    root = _run_root(args)
+    src = Path(args.source) if args.source else None
+    if src is None:
+        dets = minutely.find_detections(root)
+        if len(dets) == 1:
+            src = dets[0]
+        elif dets:
+            src = root / "detections_all.csv"
+            _concat(dets, src)
+        elif (root / "minute_activity.csv").exists():
+            src = root / "minute_activity.csv"
+        else:
+            print(f"no detections.csv or minute_activity.csv under {root}")
+            return
+    out = Path(args.output) if args.output else root / "bouts.csv"
+    b = aggregate.bouts(src, out, None, bc.get("min_bout_s"), bc.get("max_gap_s"),
+                        bc.get("max_unknown_s"))
+    summary = out.with_name("bout_summary.csv")
+    aggregate.bout_summary(b, summary, src if src.name == "minute_activity.csv" else None)
+    print(f"source {src}")
+    print(f"bouts -> {b}")
+    print(f"per-day counts -> {summary}")
+
+
+def _concat(srcs: list[Path], dest: Path) -> Path:
+    """Join per-date CSVs, keeping one header - the bout finder needs one stream.
+
+    Streamed rather than collected: a full corpus run is several million rows,
+    and `bouts()` sorts each calf's track itself, so sorting here would only
+    double the memory for nothing.
+    """
+    import csv as _csv
+
+    w = None
+    with dest.open("w", newline="") as out:
+        for s in srcs:
+            with Path(s).open() as f:
+                r = _csv.DictReader(f)
+                if w is None:
+                    w = _csv.DictWriter(out, fieldnames=r.fieldnames)
+                    w.writeheader()
+                w.writerows(r)
+    return dest
+
+
+def cmd_labelset(args):
+    cfg = load_config(Path(args.config))
+    P = _paths(args)
+    manifest, stats = labelset.select(
+        P["index"], Path(args.upload),
+        P["det"] if P["det"].exists() else None,
+        cfg.get("zones"), args.target, args.dup_thresh, args.seed)
+    print(f"{stats['frames_in']} frames -> {stats['after_dedup']} after near-duplicate "
+          f"removal -> {stats['selected']} selected")
+    print()
+    print("  group (side/posture/where)        picked / available")
+    for g, avail in stats["available_per_group"].items():
+        print(f"  {g:34s} {stats['per_group'][g]:5d} / {avail}")
+    print()
+    print(f"upload {Path(args.upload)} to Roboflow; manifest -> {manifest}")
+
+
+def cmd_combine(args):
+    root = _run_root(args)
+    files = sorted(root.glob("*/daily_summary.csv"))
+    if not files:
+        print(f"no per-date daily_summary.csv under {root}")
+        return
+    out = Path(args.output) if args.output else root / "daily_summary_all.csv"
+    print(f"{len(files)} files -> {aggregate.combine(files, out)}")
 
 
 def cmd_all(args):
@@ -148,11 +254,29 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--channel"); p.add_argument("--date")
     p.add_argument("--limit-frames", type=int)
     p.add_argument("--backend", default="auto", choices=["auto", "ffmpeg", "opencv"])
+    p.add_argument("--between", help="clock windows to keep, e.g. 06:30-08:00,18:30-20:00")
     p.set_defaults(func=cmd_extract)
 
     p = sub.add_parser("detect"); p.set_defaults(func=cmd_detect)
     p = sub.add_parser("calibrate"); p.set_defaults(func=cmd_calibrate)
     p = sub.add_parser("summarize"); p.set_defaults(func=cmd_summarize)
+
+    for name, fn in (("minutely", cmd_minutely), ("combine", cmd_combine),
+                     ("bouts", cmd_bouts)):
+        p = sub.add_parser(name)
+        p.add_argument("--run", help="run directory holding per-date results (default --out)")
+        p.add_argument("--output", help="output csv path")
+        if name == "bouts":
+            p.add_argument("--source", help="detections.csv or minute_activity.csv to read")
+        p.set_defaults(func=fn)
+
+    p = sub.add_parser("labelset")
+    p.add_argument("--upload", required=True, help="directory to fill with frames to label")
+    p.add_argument("--target", type=int, default=600, help="roughly how many frames")
+    p.add_argument("--dup-thresh", type=float, default=6.0,
+                   help="mean grey difference below which two frames count as duplicates")
+    p.add_argument("--seed", type=int, default=0)
+    p.set_defaults(func=cmd_labelset)
 
     p = sub.add_parser("all")
     p.add_argument("--videos", required=True)
